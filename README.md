@@ -467,8 +467,7 @@ adb shell /system/bin/pm unhide <包名>
 ```
 r1-guide/
 ├─ README.md            # 本文
-├─ LICENSE              # 文档许可（CC BY-NC-SA 4.0）
-├─ LICENSE-CODE         # 自建代码许可（MIT）
+├─ LICENSE              # 文档 CC BY-NC-SA 4.0 + 自建代码 MIT
 ├─ .gitignore
 ├─ r1buddy/             # 开机静音 + 保持蓝牙可连接的常驻 App（源码 + 已签名 APK）
 └─ helper/              # 免 root 小工具（app_process 运行）

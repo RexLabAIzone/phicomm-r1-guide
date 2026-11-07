@@ -1,4 +1,4 @@
-# 许可：CC BY-NC-SA 4.0
+# 一、文档内容：CC BY-NC-SA 4.0
 
 本仓库中的**文档内容**（README 及后续新增的文字、表格、整理与编排）采用
 **知识共享 署名-非商业性使用-相同方式共享 4.0 国际许可协议**
@@ -19,11 +19,35 @@
 完整法律文本（具有法律效力的正式版本）：
 https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode.zh-hans
 
-本仓库中的**自建代码**（r1buddy/、helper/）采用 MIT 许可，见 [LICENSE-CODE](LICENSE-CODE)。
+本仓库中的**自建代码**（r1buddy/、helper/）采用 MIT 许可，全文见下方第二节。
 
 ---
 
-## 引用到的第三方内容
+# 二、自建代码：MIT License
+
+Copyright (c) 2026 RexLabAIzone
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+# 三、引用到的第三方内容
 
 本仓库是资料汇编，大量条目来自他人：
 
