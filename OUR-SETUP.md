@@ -132,3 +132,54 @@ adb shell pm uninstall com.r1.buddy
 | 完整 Linux / 控灯 / 删预装 | 路线 C/D（拆机） |
 
 本方案只用到 ADB 和普通 App 权限，社区里的 Janus 补丁、拆机刷机一律没用。
+
+---
+
+## 9. 联网问题（Wi-Fi 与蓝牙模式）
+
+**现象**：`sysMode=1` 后系统会把 Wi-Fi 关掉，重启仍保持 1，所以 ADB 和一切网络功能都没了。这是原厂模式设计，不是网卡坏了。
+
+能不能"两个都要"，取决于 Wi-Fi 关闭是**一次性动作**还是**框架强制**。我们目前只确认了"结果"，没确认机制，所以先做实验，而不是直接下结论。
+
+### 路线 A：在蓝牙模式下把 Wi-Fi 重新打开（推荐先试，免 root、可回滚）
+
+已备好实验脚本，自带恢复（失败会自动切回 `sysMode=0` 并重开 Wi-Fi）：
+
+```bash
+# 先按一下 R1 顶部按键，退出蓝牙模式，Wi-Fi 会自动回来
+./tools/coexist-test.sh 192.168.99.109
+```
+
+脚本在 R1 后台依次尝试三种手段，每步记录状态：
+
+1. `svc wifi enable`
+2. `settings put global wifi_on 1` + `svc wifi enable`
+3. 以 shell 身份反射 `IWifiManager.setWifiEnabled(true)`（`WifiCtl`）
+
+判定：能在 `sysMode=1` 下拿到 `dhcp.wlan0.ipaddress` 就算成功。成功后还要用手机连一次蓝牙，确认"Wi-Fi 开着 + 蓝牙音频"能同时工作。
+
+- 若成功：把"切到蓝牙模式后立刻重开 Wi-Fi"写进 R1Buddy（v1.3），两个功能就都有了。
+- 若失败：说明是框架级限制，只能走 B 或 C。
+
+### 路线 B：改 EchoService，让普通模式下不踢蓝牙（Janus 补丁）
+
+社区（shj4588）已经用 **Janus 漏洞 CVE-2017-13156** 在无 root 的前提下替换过 `device`/`player` 两个系统包，说明"不改系统分区就能改系统应用行为"这条路是通的。
+
+思路：把 `BluetoothPlayer$2.run()` 里 `isSystemInNormalMode() → BluetoothA2dpSink.disconnect()` 这一支去掉，然后保持 `sysMode=0`：
+
+- 保留：Wi-Fi、DLNA、AirPlay、原厂语音链路
+- 获得：手机正常连蓝牙（不再被踢）
+- 代价：需要 3448、要改系统 APK 的 smali、需要自己打 Janus 包；升级或恢复出厂会丢
+- 回滚：重装原厂 APK（保留 `out.img`/原包）
+
+> 这是"真正同时要 Wi-Fi + 蓝牙"的唯一成熟路线，但比 A 重，建议 A 失败后再评估。
+
+### 路线 C：不共存，按需切换
+
+- 要蓝牙听歌：三击/保持 `sysMode=1`（当前状态）
+- 要联网/DLNA/AirPlay：按一下顶部按键回普通模式，Wi-Fi 自动回来，但手机连蓝牙会被 EchoService 踢
+- 零风险、零改动，缺点是切换要动手
+
+### 补充：蓝牙共享网络（待验证）
+
+如果 R1 的固件带 PAN/BNEP 客户端，手机开"蓝牙共享网络"后，R1 可能通过蓝牙拿到一个网络接口，这样不开 Wi-Fi 也能有网。需要在设备可达时看 `service list | grep -i pan`、`dumpsys bluetooth_manager` 是否支持。带宽与 A2DP 共用同一颗蓝牙芯片，只适合传控制/小流量，不适合串流。
