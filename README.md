@@ -12,7 +12,7 @@
 - [1. 设备与固件（实测）](#1-设备与固件实测)
 - [2. 官方服务时间线](#2-官方服务时间线)
 - [3. 按键与「模式」](#3-按键与模式)
-- [4. 五条改造路线对比](#4-五条改造路线对比)
+- [4. 六条改造路线对比](#4-六条改造路线对比)
 - [5. 社区方案总表](#5-社区方案总表)
 - [6. 免拆免 root 实操（本机验证）](#6-免拆免-root-实操本机验证)
 - [7. 关键机制详解（本机实测）](#7-关键机制详解本机实测)
@@ -104,7 +104,7 @@
 
 ---
 
-## 4. 五条改造路线对比
+## 4. 六条改造路线对比
 
 | 路线 | 需要 | 能做什么 | 风险 | 可回滚 | 来源 |
 |---|---|---|---|---|---|
@@ -113,8 +113,9 @@
 | C. 拆机 root | 拆机、焊 USB、短接 R211、U 盘 | 完整 root、改系统、删预装、控 LED | 高：焊坏/变砖 | 刷回备份 `out.img` | [14][15][16] |
 | D. Armbian 移植 | 拆机焊 USB | Linux 6.18、Wi-Fi/蓝牙/AirPlay/四麦/独立救援 | 高 | 作者称有独立救援 | [28] |
 | E. 硬件改 AUX | 丢弃原主板 | 纯有线音箱 | 不可逆 | 无 | [19] |
+| **F. 小智 AI 语音（2026 主流）** | ADB + 3 个 APK（或 Janus 补丁 odex）+ 一台跑 Docker 的机器 | 原厂四麦唤醒 + 小智大模型对话 + 点歌/曲库/电台 + Web 控制台 + DLNA/AirPlay | 中：需 3448、需联网，第三方包来源需核验 | 卸载 APK 即还原，不动系统分区 | [38][39][40] |
 
-> 本仓库只详细展开 A；B/C/D 给资料索引与风险提示，不提供一键脚本，也不附带固件。
+> 本仓库只详细展开 A；B/C/D/F 给资料索引与风险提示，不提供一键脚本，也不附带固件。
 
 ---
 
@@ -138,6 +139,22 @@
 | **SoundWire** | PC 服务端 + R1 客户端 | 把 R1 当电脑无线音箱 | 同网段 | 第三方 | [31] |
 | **小爱固件 2.4.1 / 2.10.24** | 拆机刷机 | 小爱同学 + 原厂四麦唤醒 | 拆机、刷机 | 社区固件 | [17][18][16] |
 | **R1 救砖教程** | 教程 | 刷回原厂/救援 | 拆机、Ubuntu、U 盘 | — | [13] |
+| **phicomm-r1-ota** / pexcn | OTA 描述文件 | 免拆逐级升级/降级固件（`otaprop.txt`） | adb | 未声明 | [48] |
+| **Phicomm-R1_tools** / chln | Windows 批处理 | 老一代 adb 工具箱脚本 | adb | 未声明 | [49] |
+
+**2026 年新增（语音/AI 方向）**：
+
+| 项目 / 作者 | 形态 | 能力 | 依赖 | 许可 | 来源 |
+|---|---|---|---|---|---|
+| **Phicomm_R1_XiaoZhi_Client** / shj4588 | 3 个替换 APK + smali 源码 | 小智大模型对话、原厂四麦全链路（波束/降噪/AGC/AEC）、点歌/曲库/电台、`:8080` Web 控制台 | 3448 固件、Docker 跑音源 | 未声明 | [38][39] |
+| **r1-xiaozhi** / xuan2261 | 装在 R1 的 APK（Java） | 小智唤醒词、云端/自建双模式、LED 状态、开机自启 | ADB；控灯需 root | 未声明 | [40] |
+| **r1svc / Phicomm_R1_Proxy** / ctzjj | 本地 Python 后端 | DNS 劫持 `asrv3.hivoice.cn` 接管原厂语音链路；本地 ASR + LLM + 音乐代理，设备侧零改动 | Linux/WSL + Python | GPL-3.0 | [41] |
+| **R1_Proxy** / minico | PHP 代理 | 保留原厂 App，挂 NAS 影音库 | PHP + NAS | GPL-3.0 | [42] |
+| **phicomm-r1-voice-assistant** / Enter-tainer | APK + WebSocket 服务端 | 服务端唤醒词（openWakeWord）+ ASR + LLM + TTS，R1 只当麦克风/喇叭 | 局域网服务器 | 未声明 | [43] |
+| **phicomm-r1-satellite** / sewellzhong | Python 卫星端 | Home Assistant 中文语音卫星，兼容 Android 5.1/ARMv7，ESPHome Native API，AEC 实测 | HA + 局域网 | Apache-2.0 | [44] |
+| **assist-phicom-R1** / TriTue2011 | HACS 集成 | 把 R1 接进 Home Assistant 语音助手 | HA + HACS | MIT | [45] |
+| **xiaozhi-android** / kuteo-git | 源码/构建脚本 | 在 R1（或任意 Android）上编译小智客户端 | Android Studio | 未声明 | [46] |
+| **phicomm-r1-linux** / leohou666 | 设计文档/实验 | 自建 Linux：A2DP Sink（LDAC）、AirPlay、PipeWire、AK7755 DSP | 拆机 | 未声明（进行中） | [47] |
 
 **视频与图文实战**（适合跟着一步步做）：
 
@@ -269,6 +286,7 @@ Unisound `PhicommInitializeHandler.playInitDoneTips()` → `UniMediaPlayer.playB
 | **R1ConfigWifi 网页** | 打开作者托管网页配网 | 作者服务器 | [23] |
 | **声波配网** | 长按后由 App 用声音把 Wi-Fi 账号密码「播」给音箱 | 配套 App | [2] |
 | **ADB 直接连 Wi-Fi** | 通过热点连上 R1 的 ADB，再用 `am start`/`svc` 或 `adbjoinwifi` 类 App 连指定 Wi-Fi | adb | [5][7][8] |
+| **R1-join-wifi 脚本** | cyberty 的纯脚本方案，不装 App，直接让 R1 入网 | adb | [50] |
 | **DNS/hosts 劫持** | 路由器 DNS 指到社区 IP（如 47.240.76.176），绕过「音箱未绑定」 | 路由器 | [10][12] |
 
 > 重要：配网热点是**无密码开放热点**，电脑可以连进去；连上后 R1 通常有局域网 IP，可尝试 `adb connect <IP>:5555`。这既是配网通道，也是「音箱没有 Wi-Fi 时重新拿到 ADB」的后门。[5][6]
@@ -286,6 +304,7 @@ Unisound `PhicommInitializeHandler.playInitDoneTips()` → `UniMediaPlayer.playB
 | 音乐 App V0.6.8 | 原厂四麦+播放器，语音点歌，DLNA 播放，`IP:8080` 管理 | [29] |
 | Home Assistant | 通过 DLNA 集成接入 HA，可做 TTS/媒体播放 | [32] |
 | SoundWire | PC 端播放，R1 当无线音箱 | [31] |
+| 多机串联 | 刷入串联文件后用电脑软件把多台 R1 组左右声道/立体声（走 Wi-Fi，不插线） | [51] |
 
 ---
 
@@ -317,7 +336,29 @@ Unisound `PhicommInitializeHandler.playInitDoneTips()` → `UniMediaPlayer.playB
 ### 10.5 固件升级（免拆）
 
 - 3119→3448 需逐级升级；`R1up4Mac` 用本地 HTTP 服务 + ADB 推送固件。[27]
+- `phicomm-r1-ota` 提供各版本间 `otaprop.txt` 描述文件，推送后重启即可 OTA，免拆机。[48]
 - 工具箱的「一键升级固件.bat」也可升级；过程断电有变砖风险。[2][22]
+
+### 10.6 小智（Xiaozhi）AI 语音（2026 主流）
+
+原厂云 2019 年就停了，2026 年社区的主流玩法是把 R1 变成小智 AI 音箱。三种实现，风险递增：
+
+1. **替换 3 个 APK（免拆、可卸载还原）** —— shj4588 的方案，要求固件恰好是 **3448**：
+   - 三个包：主包（顶替 `com.phicomm.speaker.device`）、控制台包（顶替 `com.phicomm.speaker.player`）、so 宿主包。[38][39]
+   - 原理：不改系统、不刷分区，用 **Janus 漏洞（CVE-2017-13156）** 把客户端顶进原厂 speaker 进程；SELinux 域不变、四麦 HAL 原样保留，卸载即还原。[39]
+   - 保留原厂四麦的波束成形/降噪/AGC/AEC，放歌时也能唤醒；`smali` 层已拆掉「未绑定/无网络/待升级」三道拦截。[39]
+   - 能力：小智大模型对话（官方服务器或自建 `xiaozhi-esp32-server`）、点歌/歌手连播/随机/电台、自定义歌单 txt 导入、Web 控制台 `http://<R1-IP>:8080`（播放/歌词/音量/蓝牙/DLNA/AirPlay）、LED 氛围灯。[38][39]
+   - 音源另需一台跑 Docker 的机器（群晖/飞牛/N1/软路由/迷你主机）。[39]
+2. **装普通 APK** —— xuan2261 的 `r1-xiaozhi`：Java 应用，小智唤醒词、云端/自建双模式、开机自启，控灯需 root。[40]
+3. **只接管后端、设备零改动** —— ctzjj 的 `r1svc`：DNS 劫持 `asrv3.hivoice.cn` 到本机，接管 ASR/NLU/音乐/聊天链路，音频不出内网。[41]
+
+- 另有 UP 主做了「三系统」版本：同一台机器在 App 界面里切换小讯/小智/小爱，适合对比识别效果与音效。[52]
+
+另有面向 Home Assistant 的路线：`phicomm-r1-satellite`（语音卫星，Apache-2.0）与 `assist-phicom-R1`（HACS 集成，MIT）。[44][45]
+
+> ⚠️ 这三条都要 **Wi-Fi + 联网**，与本文路线 A 的「蓝牙模式（sysMode=1，系统会关 Wi-Fi）」互斥。切换前先想清楚要「手机蓝牙即连」还是「语音助手」；两者目前不能同时要。
+>
+> 回滚：`pm uninstall` 掉三个包（或 `pm uninstall --user 0`），或把 DNS 改回自动获取。全程不动 `out.img`。
 
 ---
 
@@ -387,7 +428,7 @@ adb shell /system/bin/pm unhide <包名>
 
 ## 14. 覆盖范围与免责声明
 
-**已覆盖**：GitHub 项目、恩山论坛、瀚思彼岸、CSDN、博客、B 站/YouTube 视频、拆解报告、二手交易经验；硬件、固件、root、免拆、Linux、语音后端、DLNA、救砖、配网、DNS 劫持。
+**已覆盖**：GitHub 项目、恩山论坛、瀚思彼岸、CSDN、博客、B 站/YouTube 视频、拆解报告、二手交易经验；硬件、固件、root、免拆、Linux、语音后端（小智 / 本地 ASR+LLM / HA 卫星）、DLNA、救砖、配网、DNS 劫持、多机串联。
 
 **未覆盖 / 不收录**：
 - 百度网盘、QQ 群文件等无法验证的下载包；
@@ -438,6 +479,21 @@ adb shell /system/bin/pm unhide <包名>
 35. YouTube《斐讯R1音响刷小爱同学，保姆级别教程》—— https://www.youtube.com/watch?v=JHVJuS7biOM
 36. 恩山论坛《R1音箱最简单使用指南》—— https://www.right.com.cn/forum/thread-4017380-1-1.html
 37. 恩山论坛《玩R1音响的源码，支持原版4麦方案，集成酷我音乐，可直接编译》—— https://www.right.com.cn/forum/thread-8284979-1-1.html
+38. GitHub / shj4588《Phicomm_R1_XiaoZhi_Client》（V2.0.1 源码 + 原厂包 + 逆向资料）—— https://github.com/shj4588/Phicomm_R1_XiaoZhi_Client
+39. 恩山论坛 / shj4588《【斐讯R1复活计划】秒杀原厂语音的小智AI音箱：固件+曲库+在线音源全开源教程》（2026-10-30）—— https://www.right.com.cn/forum/thread-8495552-1-1.html
+40. GitHub / xuan2261《r1-xiaozhi》—— https://github.com/xuan2261/r1-xiaozhi
+41. GitHub / ctzjj《Phicomm_R1_Proxy（r1svc）》GPL-3.0 —— https://github.com/ctzjj/Phicomm_R1_Proxy
+42. GitHub / minico《R1_Proxy》GPL-3.0 —— https://github.com/minico/R1_Proxy
+43. GitHub / Enter-tainer《phicomm-r1-voice-assistant》—— https://github.com/Enter-tainer/phicomm-r1-voice-assistant
+44. GitHub / sewellzhong《phicomm-r1-satellite》Apache-2.0 —— https://github.com/sewellzhong/phicomm-r1-satellite
+45. GitHub / TriTue2011《assist-phicom-R1》MIT（HACS 集成）—— https://github.com/TriTue2011/assist-phicom-R1
+46. GitHub / kuteo-git《xiaozhi-android》—— https://github.com/kuteo-git/xiaozhi-android
+47. GitHub / leohou666《phicomm-r1-linux》（Armbian/PipeWire/AK7755 实验）—— https://github.com/leohou666/phicomm-r1-linux
+48. GitHub / pexcn《phicomm-r1-ota》（各版本 otaprop OTA 文件）—— https://github.com/pexcn/phicomm-r1-ota
+49. GitHub / chln《Phicomm-R1_tools》—— https://github.com/chln/Phicomm-R1_tools
+50. GitHub / cyberty《R1-join-wifi》GPL-3.0 —— https://github.com/cyberty/R1-join-wifi
+51. B 站《斐讯r1音箱软件串联使用教程》（多机串联组立体声）—— https://www.bilibili.com/video/BV1wzh2zwEd1/
+52. 抖音《给斐讯r1安装小智》（三系统切换：小讯/小智/小爱）—— https://www.douyin.com/shipin/7582405772399642666
 
 > 注：论坛/博客链接可能随时间失效；固件与 APK 请自行核验来源与哈希，本仓库不提供下载。
 
@@ -455,7 +511,9 @@ adb shell /system/bin/pm unhide <包名>
 - **cyberty**：R1up4Mac
 - **allinster**：R1 Armbian 移植
 - **powerSee、星河（xinghevlog）、zhigao5191、lome、Destroyer_Dream、laddie132、weixin_29172963、weixin_39968490、qq_41615718、yanglang** 等博客作者
-- **恩山论坛、瀚思彼岸、我爱音频网、B 站/YouTube UP 主**及所有匿名分享者
+- **shj4588**：小智 AI 复活方案（3 包 + 逆向资料 + 全流程教程）
+- **xuan2261、ctzjj、minico、Enter-tainer、sewellzhong、TriTue2011、kuteo-git、leohou666、pexcn、chln、cyberty**：2026 年语音/后端/Linux 方向的实现
+- **恩山论坛、瀚思彼岸、我爱音频网、B 站/抖音/YouTube UP 主**及所有匿名分享者
 - 斐讯 R1 硬件与固件的最初设计者（Unisound 语音、EchoService 播放器）
 
 如果本文引用了你的内容而署名不全，请提 Issue，我会补充或删除。
