@@ -15,6 +15,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.provider.Settings;
 import android.util.Log;
 
 import java.lang.reflect.Method;
@@ -28,7 +29,6 @@ public class GuardService extends Service {
     private static final long BOOT_MUTE_WINDOW_MS = 120000L;
     private static final long MUTE_MS = 25000L;
     private static final long DISCOVERABLE_MS = 120000L;
-    private static final long RECONNECT_DISCOVERABLE_MS = 60000L;
     private static final long ENFORCE_MS = 8000L;
     // BluetoothProfile.A2DP_SINK 是 @hide 常量，SDK 里没有，直接用字面值
     private static final int PROFILE_A2DP_SINK = 11;
@@ -43,6 +43,7 @@ public class GuardService extends Service {
     private boolean a2dpConnected;
     private BluetoothProfile sink;
     private boolean sinkRequested;
+    private boolean sysModeBroken;
 
     private final BroadcastReceiver a2dpReceiver = new BroadcastReceiver() {
         @Override
@@ -57,14 +58,13 @@ public class GuardService extends Service {
                 }
                 restoreVolume();
             } else if (state == BluetoothProfile.STATE_DISCONNECTED) {
-                Log.i(TAG, "A2DP disconnected, discoverable for reconnect");
+                Log.i(TAG, "A2DP disconnected");
                 a2dpConnected = false;
-                setScanMode(23);
-                handler.postDelayed(new Runnable() {
-                    public void run() {
-                        setScanMode(21);
-                    }
-                }, RECONNECT_DISCOVERABLE_MS);
+                // 只回到「可连接」。改成可发现会让手机立刻回连，
+                // 看起来就像刚切出去又被拉回蓝牙模式。
+                if (isBtMode()) {
+                    setScanMode(21);
+                }
             }
         }
     };
@@ -100,17 +100,56 @@ public class GuardService extends Service {
         }
         if (SystemClock.elapsedRealtime() < BOOT_MUTE_WINDOW_MS) {
             muteForBoot();
-            setScanMode(23);
-            handler.postDelayed(new Runnable() {
-                public void run() {
-                    setScanMode(21);
-                }
-            }, DISCOVERABLE_MS);
-            scheduleBootReconnect();
-        } else {
+            if (isBtMode()) {
+                setScanMode(23);
+                handler.postDelayed(new Runnable() {
+                    public void run() {
+                        setScanMode(21);
+                    }
+                }, DISCOVERABLE_MS);
+                scheduleBootReconnect();
+            }
+        } else if (isBtMode()) {
             enforceScanMode();
         }
         handler.post(enforcer);
+    }
+
+    /**
+     * 当前是否处于蓝牙模式（sysMode=1）。
+     * 正常模式（sysMode=0）下回连和扫描模式都由系统自己管，我们不插手；
+     * 读不到 sysMode 时用 Wi-Fi 开关兜底，仍判断不了就当作非蓝牙模式，保持安静。
+     */
+    private boolean isBtMode() {
+        if (!sysModeBroken) {
+            try {
+                Object m = getSystemService("FXSystemPrivate");
+                if (m != null) {
+                    Object r = m.getClass().getMethod("getSysMode").invoke(m);
+                    if (r instanceof Integer) {
+                        int mode = (Integer) r;
+                        if (mode == 1 || mode == 0) {
+                            return mode == 1;
+                        }
+                    }
+                }
+            } catch (Throwable t) {
+                sysModeBroken = true;
+                Log.w(TAG, "getSysMode failed, fallback to wifi_on: " + t);
+            }
+        }
+        try {
+            int wifiOn = Settings.Global.getInt(getContentResolver(), "wifi_on", -1);
+            if (wifiOn == 1) {
+                return false;
+            }
+            if (wifiOn == 0) {
+                return true;
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "read wifi_on failed: " + t);
+        }
+        return false;
     }
 
     /**
@@ -172,6 +211,10 @@ public class GuardService extends Service {
             Log.i(TAG, "bt disabled, skip reconnect");
             return;
         }
+        if (!isBtMode()) {
+            Log.i(TAG, "not in bt mode, skip reconnect");
+            return;
+        }
         ensureSink();
         if (sink == null) {
             Log.i(TAG, "sink not ready, skip reconnect");
@@ -219,12 +262,12 @@ public class GuardService extends Service {
         if (adapter == null) {
             return;
         }
+        // 蓝牙被关掉时不再主动打开：用户可能刚按一下切到正常模式，
+        // 抢着开蓝牙只会把他又拖回蓝牙模式。
         if (!adapter.isEnabled()) {
-            try {
-                adapter.enable();
-            } catch (Throwable t) {
-                Log.w(TAG, "enable failed: " + t);
-            }
+            return;
+        }
+        if (!isBtMode()) {
             return;
         }
         int mode = adapter.getScanMode();

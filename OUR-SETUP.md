@@ -25,7 +25,7 @@
 | 固件 | 3448 | 原厂 |
 | sysMode | **1**（蓝牙模式，重启保持） | `ISysPrivate.setSysMode(1)`，见 `helper/BtCtl.java` |
 | Wi-Fi | 关闭 | 蓝牙模式的系统行为，非人为禁用 |
-| 蓝牙 | 开机自动启用，扫描模式保持 21（可连接） | `R1Buddy` 每 20 秒纠正一次 |
+| 蓝牙 | 开机自动启用，蓝牙模式下扫描模式保持 21（可连接） | `R1Buddy` 每 8 秒检查一次，仅在 `sysMode=1` 时纠正 |
 | 开机提示音 | 无 | `R1Buddy` 开机把 STREAM_MUSIC 置 0，25 秒后恢复原值 |
 | 连接方式 | 手机点一次已配对的 `Phicomm_R1_xxxx` | 手机侧发起 |
 | 回滚 | `pm uninstall com.r1.buddy` + `setSysMode(0)` | 全部可逆 |
@@ -50,13 +50,14 @@
 
 一个前台服务 + 一个开机广播，无界面、无网络权限。
 
-| 参数 | 1.1（已验证） | 1.2（待验证） |
+| 参数 | 1.1（已验证） | 1.2 / 1.3 |
 |---|---|---|
 | 静音开始 | 开机 120 秒内 | 不变 |
 | 静音恢复 | 25 秒后 / A2DP 连上时 | 不变 |
-| 扫描模式纠正间隔 | 20 秒 | **8 秒** |
-| 断开后进入可发现 | 是，60 秒后回 21 | 不变 |
-| 开机主动回连 | 无 | **12/30/60 秒各试一次** |
+| 扫描模式纠正间隔 | 20 秒 | **8 秒**（1.3 起仅在蓝牙模式纠正） |
+| 断开后进入可发现 | 是，60 秒后回 21 | 1.2 是；**1.3 否，只设 21** |
+| 开机主动回连 | 无 | **12/30/60 秒各试一次**（1.3 起仅蓝牙模式） |
+| 蓝牙被关时自动重开 | 无 | 1.2 会（`adapter.enable()`）；**1.3 已删除** |
 | 记住最后连接的手机 | 无 | 有（`lastAddr`） |
 | 手动触发回连 | 无 | `am startservice -a com.r1.buddy.RECONNECT` |
 
@@ -67,15 +68,36 @@
 
 > ⚠️ **1.2 尚未在真机验证**：R1 当前处于蓝牙模式（无 Wi-Fi），ADB 不可达。代码能编译、能打包、签名与 1.1 相同（SHA-256 `d1fc5c96…225bb6`，`CN=R1Buddy`），但回连是否成功、8 秒间隔是否引起抖动，需要在有网络或 USB 的条件下实测。
 
+### 1.3：不再和用户抢模式（2026-11-08）
+
+**现象**：按一下顶部按键后，很快就"变回蓝牙模式"。
+
+排查结果：
+
+- 全源码 `grep` 确认 R1Buddy **没有任何 `setSysMode` 调用**，模式不是它直接改的；
+- 但 1.2 的 8 秒巡检里有一句 `adapter.enable()`：只要发现蓝牙被关掉就重新打开。谁关的都会被它在 8 秒内撤销，系统随之又回到蓝牙模式——这就是"很快变回去"最可能的直接原因；
+- 1.2 还在 A2DP 断开时把音箱设成**可发现（23）**，等于主动招呼手机回来连；
+- 反编译确认按键映射：蓝牙模式下单击 = `closeBlueToothStatus` = 发 msg 64/2 = `EasyPlayer.stopWaitingExternalConnect()`，只停止"等待外部连接"的播放，**不改 sysMode**。真正切模式的是框架/系统服务，不在这些 APK 里。
+
+1.3 的改法：
+
+1. **删掉 `adapter.enable()`**：蓝牙被关就保持关，绝不主动开；
+2. 所有主动动作（纠正扫描模式、开机回连、断开后处理）先读 `getSystemService("FXSystemPrivate").getSysMode()`，只有 `sysMode==1` 才动手；读不到时用 `Settings.Global.wifi_on` 兜底（Wi-Fi 开着 = 正常模式 = 完全不插手）；
+3. 断开后只设 21（可连接），不再设 23（可发现）。
+
+效果：正常模式下 R1Buddy 完全静默；蓝牙模式下功能与之前相同。
+
+验证：`adb logcat -s R1Buddy`，按一下之后不应再出现任何 `setScanMode` / `enable` 相关日志。版本号 1.3 / versionCode 4，签名不变。
+
 ---
 
-## 5. 验证 1.2（等 R1 能连 ADB 时）
+## 5. 验证 1.3（等 R1 能连 ADB 时）
 
 ```bash
 adb connect <R1-IP>:5555
 
 # 安装（-r 覆盖；签名相同，不丢数据）
-adb install -r R1Buddy-1.2.apk
+adb install -r R1Buddy-1.3.apk
 
 # 触发一次手动回连
 adb shell am startservice -a com.r1.buddy.RECONNECT -n com.r1.buddy/.GuardService
@@ -91,7 +113,9 @@ adb logcat -s R1Buddy
 3. `A2DP connected` —— 手机确认连上。
 4. `scan mode was 20, fix to 21` 频次 —— 若连接后反复出现，说明 EchoService 在抢，属正常，但不应导致声音中断。
 
-验证点：重启 → 不动手机，看是否自动连上；若自动连上，则"手动点一次"这一步可以去掉。
+另外要确认 1.3 的关键行为：**按一下顶部按键之后，日志里不应再出现 `setScanMode`**。如果仍出现，说明 `isBtMode()` 把正常模式误判成了蓝牙模式，把当时的 `getSysMode` 日志发出来即可。
+
+验证点：重启 → 不动手机，看是否自动连上；若自动连上，则"手动点一次"这一步可以去掉。若 `reconnect` 一直返回 `false` 或日志出现 `getSysMode failed`，说明读不到模式、1.3 会退化成"完全不插手"，此时需要换判据。
 
 若 `reconnect` 一直返回 `false`：可加一步兜底——先连 HFP（`HEADSET_CLIENT`，profile 16）把 ACL 链路拉起来，再连 A2DP。社区的蓝牙自动重连实现就是按 `HEADSET_CLIENT → A2DP_SINK` 的顺序依次尝试的；这一步先不写进代码，等真机确认 A2DP 直连失败再加。
 
@@ -117,7 +141,8 @@ adb shell pm uninstall com.r1.buddy
 
 - 拦不住 EchoService 的 `bootInit()` 在开机时断开所有 A2DP 设备，只能在它之后重连。
 - 改不了开机音的来源（Unisound 的 mp3 与播放调用），只能静音媒体流；若日后静音失效，说明播放流被改成别的 STREAM。
-- 单次按键退出蓝牙模式（`sysMode=0`）会立刻恢复 Wi-Fi，同时手机再连就会被 EchoService 踢——这是原厂设计，不是故障。
+- 单次按键在蓝牙模式下只停止"等待外部连接"的播放器（msg 64/2），**不直接改 `sysMode`**；模式切换由框架完成，所以按键后的表现受系统状态机影响。
+- v1.3 之前，R1Buddy 会在蓝牙被关后 8 秒内重新打开它，表现为"刚切出去又弹回蓝牙模式"；1.3 已去掉这个动作。
 - 系统升级或恢复出厂会清掉 `sysMode` 与已装的 App，按 README 第 13 节重做即可。
 
 ---
@@ -158,7 +183,7 @@ adb shell pm uninstall com.r1.buddy
 
 判定：能在 `sysMode=1` 下拿到 `dhcp.wlan0.ipaddress` 就算成功。成功后还要用手机连一次蓝牙，确认"Wi-Fi 开着 + 蓝牙音频"能同时工作。
 
-- 若成功：把"切到蓝牙模式后立刻重开 Wi-Fi"写进 R1Buddy（v1.3），两个功能就都有了。
+- 若成功：把"切到蓝牙模式后立刻重开 Wi-Fi"写进 R1Buddy 的后续版本，两个功能就都有了。
 - 若失败：说明是框架级限制，只能走 B 或 C。
 
 ### 路线 B：改 EchoService，让普通模式下不踢蓝牙（Janus 补丁）

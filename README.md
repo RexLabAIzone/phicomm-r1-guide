@@ -172,7 +172,7 @@
 
 ## 6. 免拆免 root 实操（本机验证）
 
-> 本仓库自己这台 R1 的最终配置、取舍与 v1.2 优化项，单独写在 **[OUR-SETUP.md](OUR-SETUP.md)**（实测记录 + 待验证项 + 回滚方法）。
+> 本仓库自己这台 R1 的最终配置、取舍与 v1.3 优化项，单独写在 **[OUR-SETUP.md](OUR-SETUP.md)**（实测记录 + 待验证项 + 回滚方法）。
 
 ### 6.1 工具链
 
@@ -185,7 +185,7 @@
 
 1. `BOOT_COMPLETED` 时把 `STREAM_MUSIC` 音量置 0，25 秒后恢复（开机音是 Unisound 用媒体流播的 `bootloader_completed.mp3`）；
 2. 开机 120 秒内扫描模式 23（可发现），之后回 21（可连接）；
-3. 每 20 秒纠正异常扫描模式；A2DP 断开时再开放发现 60 秒。
+3. 每 8 秒纠正异常扫描模式（**仅当 `sysMode=1` 时**）；A2DP 断开时只回 21（可连接），不再改成可发现。
 
 ```bash
 adb connect <R1_IP>:5555
@@ -197,7 +197,7 @@ adb logcat -s R1Buddy
 
 回滚：`adb shell /system/bin/pm uninstall com.r1.buddy`
 
-> R1Buddy 在扫描模式异常时也会尝试 `adapter.enable()`，即会主动把蓝牙重新打开。
+> v1.2 曾在蓝牙被关时自动 `adapter.enable()`，会把用户刚切走的蓝牙重新打开；**v1.3 已删除这个动作**，并在正常模式（`sysMode=0`）下完全不干预。
 
 ### 6.3 切换模式（sysMode）
 
@@ -227,7 +227,7 @@ CLASSPATH=/data/local/tmp/scan.dex   app_process /system/bin SetScan 23
 |---|---|---|
 | 只当蓝牙音箱 | `sysMode=1` + R1Buddy | 开机即蓝牙模式；手机点一次已配对记录即可连接；**无 Wi-Fi** |
 | 要联网/DLNA | `sysMode=0` + 蓝牙开启 | Wi-Fi/DLNA 可用；手机一连接就被 EchoService 断开 |
-| 临时联网 | 蓝牙状态下单击按键 | 退出蓝牙模式，Wi-Fi 自动回连；三击可回蓝牙模式 |
+| 临时联网 | 蓝牙状态下单击按键 | 尝试退出蓝牙模式并恢复 Wi-Fi；v1.3 起 R1Buddy 不会再把它拽回蓝牙模式 |
 
 ---
 
@@ -252,7 +252,7 @@ Utils.isSystemInNormalMode(context) == true
 
 - 进入蓝牙模式后 EchoService 设 23（可发现），并启动 DLNA/AirPlay。
 - 连接成功后 EchoService 设 20（NONE）；`systemtool` 的 BtMonitor 开机也设 20。
-- R1Buddy 每 20 秒纠正 20→21，断开时短暂开放 23。
+- R1Buddy 每 8 秒纠正 20→21（仅蓝牙模式），断开后只回 21，不再开放 23。
 
 ### 7.3 开机提示音
 
@@ -532,7 +532,8 @@ r1-guide/
 ├─ .gitignore
 ├─ r1buddy/             # 开机静音 + 保持蓝牙可连接的常驻 App
 │  ├─ R1Buddy.apk        #   v1.1，已在真机验证
-│  └─ R1Buddy-1.2.apk    #   v1.2，新增开机主动回连，尚未在真机验证
+│  ├─ R1Buddy-1.2.apk    #   v1.2，新增开机主动回连，尚未在真机验证
+│  └─ R1Buddy-1.3.apk    #   v1.3，删除自动开蓝牙，正常模式完全静默，待真机验证
 └─ helper/              # 免 root 小工具（app_process 运行）
    ├─ BtCtl.java        # 读取/切换 sysMode，开关蓝牙
    ├─ SysMode.java      # 仅读写 sysMode
