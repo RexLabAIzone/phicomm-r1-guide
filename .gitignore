@@ -1,0 +1,19 @@
+# 构建中间产物
+*.class
+*.dex
+classes/
+classes-*/
+dex*/
+build/
+bin/
+obj/
+
+# 本地环境与日志
+local.properties
+*.log
+logs/
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
