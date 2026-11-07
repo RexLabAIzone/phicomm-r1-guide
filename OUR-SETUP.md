@@ -93,6 +93,8 @@ adb logcat -s R1Buddy
 
 验证点：重启 → 不动手机，看是否自动连上；若自动连上，则"手动点一次"这一步可以去掉。
 
+若 `reconnect` 一直返回 `false`：可加一步兜底——先连 HFP（`HEADSET_CLIENT`，profile 16）把 ACL 链路拉起来，再连 A2DP。社区的蓝牙自动重连实现就是按 `HEADSET_CLIENT → A2DP_SINK` 的顺序依次尝试的；这一步先不写进代码，等真机确认 A2DP 直连失败再加。
+
 ### 回滚
 
 ```bash
