@@ -172,6 +172,8 @@
 
 ## 6. 免拆免 root 实操（本机验证）
 
+> 本仓库自己这台 R1 的最终配置、取舍与 v1.2 优化项，单独写在 **[OUR-SETUP.md](OUR-SETUP.md)**（实测记录 + 待验证项 + 回滚方法）。
+
 ### 6.1 工具链
 
 - `adb`；Android SDK（`android.jar` API 21、`d8`、`zipalign`、`apksigner`）；JDK 17（编译用 `-source 8 -target 8`）。
@@ -525,9 +527,12 @@ adb shell /system/bin/pm unhide <包名>
 ```
 r1-guide/
 ├─ README.md            # 本文
+├─ OUR-SETUP.md         # 本项目的实测配置、取舍与回滚
 ├─ LICENSE              # 文档 CC BY-NC-SA 4.0 + 自建代码 MIT
 ├─ .gitignore
-├─ r1buddy/             # 开机静音 + 保持蓝牙可连接的常驻 App（源码 + 已签名 APK）
+├─ r1buddy/             # 开机静音 + 保持蓝牙可连接的常驻 App
+│  ├─ R1Buddy.apk        #   v1.1，已在真机验证
+│  └─ R1Buddy-1.2.apk    #   v1.2，新增开机主动回连，尚未在真机验证
 └─ helper/              # 免 root 小工具（app_process 运行）
    ├─ BtCtl.java        # 读取/切换 sysMode，开关蓝牙
    ├─ SysMode.java      # 仅读写 sysMode
