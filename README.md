@@ -42,6 +42,8 @@
 **最关键的一条：R1 有「模式」之分。**
 `sysMode=0`（普通模式）下 EchoService 会**主动踢掉**手机发起的 A2DP 连接；`sysMode=1`（蓝牙模式）才能稳定连接，但系统会关闭 Wi-Fi。两者目前无法兼得（第 7 节，实测）。
 
+**第二条：免拆配网已确认无解。** 3448 没有 SoftAP（没有配网热点），官方 App 已下架，社区配置服务器停运；长按只会进橙灯配网等待，等不到凭据（第 7.6、8 节）。要联网只剩拆机刷机或用 Janus 改系统包。
+
 ---
 
 ## 1. 设备与固件（实测）
@@ -92,13 +94,26 @@
 | 当前状态 | 单击 | 双击 | 三击 | 长按 |
 |---|---|---|---|---|
 | 普通模式 | 唤醒/播放控制 | 休眠 [20] | **进入蓝牙模式** | **进入配网模式** |
-| 蓝牙模式 | **退出蓝牙模式**（回普通模式） | 休眠 | 重置蓝牙状态 | **退出蓝牙 + 配网** |
+| 蓝牙模式 | 停止外部播放，随后转红灯（休眠态） | 休眠 + TTS「开始休眠」 | 重置蓝牙状态 | **退出蓝牙 + 配网**，TTS「开始网络配置」 |
+| 配网模式 | **退出配网**（恢复唤醒，灯回蓝绿） | — | 无动作（只打日志） | 重新进入配网 |
 
-代码依据（Unisound `com.phicomm.speaker.device`，实测反编译）：
+代码依据（Unisound `com.phicomm.speaker.device`，实测反编译 `OneClick/DoubleClick/TripleClick/LongClickProcessor`）：
 
 - 三击 → `TripleClickProcessor.openBluetooth()` → `PhicommXController.openBlueToothStatus()` → `Message(what=64, arg1=1)`。
-- 单击（蓝牙状态）→ `closeBlueToothStatus()` → `Message(64, 2)`；三击在蓝牙状态 → `resetBlueToothStatus()` → `Message(64, 3)`。
-- 长按（蓝牙状态）→ `closeBlueToothStatus()` + `startConnectNet()` → `Message(0x40000, 1)` 进入配网；退出配网是 `Message(0x40000, 2)`。
+- 单击（蓝牙状态）→ `BluetoothOutputEvent(false)` + `closeBlueToothStatus()`（`Message(64, 2)`）+ `startWakeup()`；实机表现为停止播放、灯转红。
+- 双击（蓝牙状态）→ `DormantOutputEvent(true)` + `closeBlueToothStatus()` + TTS `0x7f050086`「开始休眠」+ `stopWakeup()`。
+- 三击（蓝牙状态）→ `resetBlueToothStatus()`（`Message(64, 3)`）。
+- 长按（任何状态）→ `startConnectNet()`：写 `NetworkConfigOutputEvent(true)` + `Message(0x40000, 1)` + `stopWakeup()`；退出配网是 `Message(0x40000, 2)`。
+- 配网状态下三击是空操作，必须先单击退出配网。
+
+指示灯（3448 实机观察，非文档）：
+
+| 灯 | 含义 |
+|---|---|
+| 很淡的红（呼吸） | 休眠/待机 |
+| **橙色闪烁** | **配网等待中**（设备状态 17），不是故障 |
+| 蓝绿常亮 | 蓝牙模式待连接（可正常使用） |
+| 蓝色约 3 秒 | 单击唤醒后的瞬时反馈，之后回到原色 |
 
 > 社区也称三击为「打开蓝牙其实是同时打开蓝牙/DLNA/AirPlay」[2]。
 
@@ -226,7 +241,7 @@ CLASSPATH=/data/local/tmp/scan.dex   app_process /system/bin SetScan 23
 |---|---|---|
 | 只当蓝牙音箱 | `sysMode=1` + R1Buddy | 开机即蓝牙模式；手机点一次已配对记录即可连接；**无 Wi-Fi** |
 | 要联网/DLNA | `sysMode=0` + 蓝牙开启 | Wi-Fi/DLNA 可用；手机一连接就被 EchoService 断开 |
-| 临时联网 | 蓝牙状态下单击按键 | 尝试退出蓝牙模式并恢复 Wi-Fi；v1.3 起 R1Buddy 不会再把它拽回蓝牙模式 |
+| 临时联网 | 蓝牙状态下长按 | 进入配网（橙灯闪），但见第 8 节：3448 没有热点、官方 App 已停，实际配不进去；单击可退出 |
 
 ---
 
@@ -276,21 +291,37 @@ Unisound `PhicommInitializeHandler.playInitDoneTips()` → `UniMediaPlayer.playB
 
 `EchoService` 的 `IPlayer` AIDL 暴露 `startServer()` / `stopServer()`（日志 `CMD: startServer`），可作等效触发点，但**不会**改 `sysMode`。
 
+### 7.6 配网链路：没有热点，只有声波 / App
+
+长按 → `startConnectNet()`：
+
+1. 写 `NetworkConfigOutputEvent(true)` 进 ANT pipeline（播放配网载波音，很多人会听成"放了段本地音乐"）；
+2. `PhicommXController.openConnectNetStatus()` → `Message(0x40000, 1)`；
+3. `stopWakeup()`，语音唤醒暂时关闭；
+4. 系统 `msgcenter`（`MessageDispatchManager`）收到 0x40000 后把设备状态置为 **17（配网）**，橙灯开始闪。
+
+`startConnectNet()` **本身不打开 Wi-Fi**，也不改 `sysMode`；0x40000 的最终处理在系统服务里，不在任何 APK 中，无法静态确认它是否顺带开 Wi-Fi。
+
+**没有 SoftAP。** 在 Unisound / EchoService / SystemTool / NetControl 里全量搜索 `hostapd`、`192.168.43`、`192.168.4.1`、`setWifiApEnabled`、`WifiAp`、`startAccessPoint`、`SoftAp`、`WIFI_AP`、`ap_ssid`，**零命中**；`Phicomm_R1_` 只作为 AirPlay/DLNA 的 hostname 出现在 `ShairportConfiguration` 和 `LocalConfigSharePreference`。
+
+2026-11-08 在 3448 实机验证：长按后橙灯闪，手机 Wi-Fi 列表**不会**出现任何新热点，等 1–2 分钟无果；单击退出配网，灯回蓝绿，蓝牙播放不受影响，`sysMode` 仍为 1、Wi-Fi 仍关闭。
+
 ---
 
-## 8. 配网方式大全
+## 8. 配网方式大全（附 2026-11 实测状态）
 
-| 方式 | 做法 | 依赖 | 来源 |
+| 方式 | 做法 | 状态（3448 实机，2026-11-08） | 来源 |
 |---|---|---|---|
-| **长按 + 热点 + 网页** | 长按进入配网，R1 开出无密码热点 `Phicomm_R1_xxx`；连接后浏览器打开 `http://106.12.194.27:19986/`，填 Wi-Fi 名/密码 | 第三方网页 | [5][6] |
-| **微信小程序「R1 音箱遥控器」** | 微信搜索小程序，按其「音箱 WiFi 联网」引导配网 | 手机微信 | [2][4] |
-| **R1ConfigWifi 网页** | 打开作者托管网页配网 | 作者服务器 | [23] |
-| **声波配网** | 长按后由 App 用声音把 Wi-Fi 账号密码「播」给音箱 | 配套 App | [2] |
-| **ADB 直接连 Wi-Fi** | 通过热点连上 R1 的 ADB，再用 `am start`/`svc` 或 `adbjoinwifi` 类 App 连指定 Wi-Fi | adb | [5][7][8] |
-| **R1-join-wifi 脚本** | cyberty 的纯脚本方案，不装 App，直接让 R1 入网 | adb | [50] |
-| **DNS/hosts 劫持** | 路由器 DNS 指到社区 IP（如 47.240.76.176），绕过「音箱未绑定」 | 路由器 | [10][12] |
+| **长按 + 热点 + 网页** | 长按进入配网，R1 开出无密码热点 `Phicomm_R1_xxx`；连接后浏览器打开 `http://106.12.194.27:19986/`，填 Wi-Fi 名/密码 | **不成立**：本固件没有任何 SoftAP 代码，热点根本不存在（第 7.6 节） | [5][6] |
+| **微信小程序「R1 音箱遥控器」** | 微信搜索小程序，按「音箱 WiFi 联网」引导配网 | **大概率不可用**：若引导要求先连 R1 热点，同样卡在无热点 | [2][4] |
+| **R1ConfigWifi 网页** | 打开作者托管网页配网 | **已失效**：`106.12.194.27:19986` 实测 8 秒超时（2026-11-08） | [23] |
+| **声波配网** | 长按后由 App 用声音把 Wi-Fi 账号密码「播」给音箱 | **原理可行，但缺 App**：固件侧确有 `NetworkConfigOutputEvent` 与 `WifiConnect`，但没有可用的下发端 | [2] |
+| **ADB 直接连 Wi-Fi** | 通过热点连上 R1 的 ADB，再用 `am start`/`svc` 或 `adbjoinwifi` 类 App 连指定 Wi-Fi | 依赖热点或 ADB，本机两者都不可得 | [5][7][8] |
+| **R1-join-wifi 脚本** | cyberty 的纯脚本方案，不装 App，直接让 R1 入网 | 同样需要先有 ADB | [50] |
+| **DNS/hosts 劫持** | 路由器 DNS 指到社区 IP（如 47.240.76.176），绕过「音箱未绑定」 | 只解决「未绑定」，前提是设备已经联网 | [10][12] |
 
-> 重要：配网热点是**无密码开放热点**，电脑可以连进去；连上后 R1 通常有局域网 IP，可尝试 `adb connect <IP>:5555`。这既是配网通道，也是「音箱没有 Wi-Fi 时重新拿到 ADB」的后门。[5][6]
+> **2026-11 结论：免拆、免 root 的配网路线在这台 3448 上全部走不通。**
+> 社区文章里的「连热点配网」要么对应别的固件或改过的系统，要么把 AirPlay/DLNA 的设备名 `Phicomm_R1_xxxx` 误当成了热点 SSID。要恢复联网只剩两条重路线：拆机刷机（10.1–10.3）或用 Janus 漏洞替换系统包（10.6 / OUR-SETUP 第 9 节），两条都超出「不拆机、可随时退回」的前提。
 
 ---
 
@@ -384,7 +415,13 @@ A：`sysMode=0`。三击进入蓝牙模式，或 `BtCtl status 1`。注意会关
 A：能，静音媒体流（R1Buddy）。改设置/OTA 开关无效。（实测）
 
 **Q：配网失败 / App 登录不了？**
-A：官方服务器已停 [11]。用长按热点+网页 [5][6]、微信小程序 [4] 或 R1ConfigWifi [23]。
+A：官方服务器已停 [11]，官方 App 也已下架。3448 实测**没有配网热点**（7.6 节），热点+网页、R1ConfigWifi 服务器（8 秒超时）都已不可用；没有 App 也走不了声波配网。免拆路线基本封死，见第 8 节。
+
+**Q：灯的颜色分别是什么意思？**
+A：很淡的红=休眠；**橙闪=配网等待**（不是故障）；蓝绿常亮=蓝牙模式待连接；蓝 3 秒=单击后的瞬时反馈。
+
+**Q：音量调完马上弹回？**
+A：只发生在开机后约两分钟。R1Buddy 在这段时间静音媒体流，之后 `restoreVolume()` 把开机前的音量写回去，会覆盖你刚做的调整。过了这个窗口，用手机调音量（AVRCP 绝对音量）正常生效。
 
 **Q：提示「音箱未绑定」？**
 A：社区用 DNS/hosts 劫持到 47.240.76.176 解决，绑定成功后要改回 DNS。[10][12]
