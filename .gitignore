@@ -8,6 +8,9 @@ build/
 bin/
 obj/
 
+# 预编译 APK 不分发（只保留源码）
+r1buddy/*.apk
+
 # 本地环境与日志
 local.properties
 *.log

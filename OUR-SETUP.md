@@ -96,7 +96,7 @@
 ```bash
 adb connect <R1-IP>:5555
 
-# 安装（-r 覆盖；签名相同，不丢数据）
+# 安装（自行编译产物；仓库只放源码，不发 APK）
 adb install -r R1Buddy-1.3.apk
 
 # 触发一次手动回连
@@ -122,12 +122,14 @@ adb logcat -s R1Buddy
 ### 回滚
 
 ```bash
-# 退回已验证的 1.1（versionCode 更小，必须加 -d）
+# 本机的 1.1 构建（仓库不再分发，只保留在本地）
 adb install -r -d R1Buddy.apk
 
 # 或彻底卸载
 adb shell pm uninstall com.r1.buddy
 ```
+
+> 1.1 / 1.2 有"把用户切走的蓝牙重新拉回来"的问题，**不要发给别人**；仓库只保留源码。
 
 ---
 

@@ -181,7 +181,7 @@
 
 ### 6.2 R1Buddy：开机静音 + 保持可连接
 
-源码与已签名 APK 见 [`r1buddy/`](r1buddy/)。
+源码见 [`r1buddy/`](r1buddy/)。**仓库不再提供预编译 APK**：v1.1/v1.2 会在用户切出蓝牙模式后把它重新拉回来，v1.3 尚未在真机验证，都不适合直接发给别人；需要时按第 14 节自行编译。
 
 1. `BOOT_COMPLETED` 时把 `STREAM_MUSIC` 音量置 0，25 秒后恢复（开机音是 Unisound 用媒体流播的 `bootloader_completed.mp3`）；
 2. 开机 120 秒内扫描模式 23（可发现），之后回 21（可连接）；
@@ -189,8 +189,7 @@
 
 ```bash
 adb connect <R1_IP>:5555
-adb push R1Buddy.apk /data/local/tmp/
-adb shell /system/bin/pm install -r /data/local/tmp/R1Buddy.apk
+adb install -r R1Buddy-1.3.apk    # 自行编译的产物
 adb shell am startservice -n com.r1.buddy/.GuardService
 adb logcat -s R1Buddy
 ```
@@ -530,10 +529,9 @@ r1-guide/
 ├─ OUR-SETUP.md         # 本项目的实测配置、取舍与回滚
 ├─ LICENSE              # 文档 CC BY-NC-SA 4.0 + 自建代码 MIT
 ├─ .gitignore
-├─ r1buddy/             # 开机静音 + 保持蓝牙可连接的常驻 App
-│  ├─ R1Buddy.apk        #   v1.1，已在真机验证
-│  ├─ R1Buddy-1.2.apk    #   v1.2，新增开机主动回连，尚未在真机验证
-│  └─ R1Buddy-1.3.apk    #   v1.3，删除自动开蓝牙，正常模式完全静默，待真机验证
+├─ r1buddy/             # 开机静音 + 保持蓝牙可连接的常驻 App（只放源码，不发 APK）
+│  ├─ AndroidManifest.xml
+│  └─ src/com/r1/buddy/GuardService.java
 └─ helper/              # 免 root 小工具（app_process 运行）
    ├─ BtCtl.java        # 读取/切换 sysMode，开关蓝牙
    ├─ SysMode.java      # 仅读写 sysMode
